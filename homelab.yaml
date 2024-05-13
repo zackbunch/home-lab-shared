@@ -1,0 +1,157 @@
+version: "3"
+services:
+  # Gluetun: VPN client container that routes traffic through a VPN service
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - OPENVPN_USER=<AddUsername>
+      - OPENVPN_PASSWORD=<AddPASSWORD>
+      # - SERVER_REGIONS=Netherlands
+      - SERVER_COUNTRIES=Netherlands
+    volumes:
+      - /portainer/Files/AppData/Config/Gluetun:/gluetun
+    ports:
+      - 9080:9080 # QBitTorrent Web-UI
+      - 6881:6881 # QBitTorrent
+      - 6881:6881/udp # QBitTorrent
+      - 9117:9117 # Jackett
+      - 7878:7878 # Radarr
+      - 9696:9696 # Prowlarr
+      - 8989:8989 # Sonarr
+      - 8787:8787 # Readarr
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+  qbittorrent:
+    image: ghcr.io/linuxserver/qbittorrent
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+      - UMASK=022
+      - WEBUI_PORT=9080
+    volumes:
+      - /portainer/Files/AppData/Config/qbittorrent:/config
+      - /portainer/data/torrents:/data/torrents
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  ##############################################
+  sonarr:
+    image: ghcr.io/linuxserver/sonarr
+    container_name: sonarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+    volumes:
+      - /portainer/Files/AppData/Config/Sonarr:/config
+      - /portainer/data/:/data
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  radarr:
+    image: ghcr.io/linuxserver/radarr
+    container_name: radarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+    volumes:
+      - /portainer/Files/AppData/Config/Radarr:/config
+      - /portainer/data/:/data
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  readarr:
+    image: lscr.io/linuxserver/readarr:nightly
+    container_name: readarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+    volumes:
+      - /portainer/Files/AppData/Config/Readarr:/config
+      - /portainer/data/:/data
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/Phoenix
+    volumes:
+      - /portainer/Files/AppData/Config/Prowlarr:/config
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+    volumes:
+      - /portainer/Files/AppData/Config/Overseerr:/config
+    ports:
+      - 5055:5055
+    restart: unless-stopped
+
+  jellyfin:
+    image: linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+    volumes:
+      - /portainer/Files/AppData/Config/Jellyfin:/config
+      - /portainer/data/:/data
+    ports:
+      - 8096:8096
+      - 8920:8920
+    restart: unless-stopped
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: bridge
+    ports:
+      - 32400:32400
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+      - PLEX_CLAIM=""
+    volumes:
+      - /portainer/Files/AppData/Config/Plex:/config
+      - /portainer/data/:/data
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_USER=admin
+      - KEYCLOAK_PASSWORD=admin
+    ports:
+      - 8080:8080
+    restart: unless-stopped
